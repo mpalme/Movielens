@@ -1,11 +1,28 @@
 ---
 title: "Movielens"
 author: "Massimo Palme"
-date: "24/5/2020"
+date: "30/5/2020"
 output:
+  word_document: default
   pdf_document: default
   html_document: default
 ---
+
+INTRODUCTION
+
+In this report the "Movielens" data_base is analysed and a machine learning strategy to predict root mean square error (RMSE) for rating is turned out by using different techniques. Data compounds of 10.000.000 movies ratings assigned by users. Information available is: movie Id and title, user Id, rating, genres and timestamp. The goal of the project is to obtain a RMSE < 0.86490. I obtained a RMSE < 0.86450, better than expected. Key points: I considered movie effect, user effect, genres effect and I regularized the matrix with cross validation. 
+
+In the following sections, I describe methods, results and conclusions of the project. I inserted the complete R code and some plots and tables. At the end the RMSE is validated and higlighted. 
+
+METHODS
+
+First I created the edx and validation sets and looked at the dimensions and structure of the edx data set. Then I performed machine learning to obtain RMSE considering movie, user and genre effect. Then I did a regulraziation process. Finally, I improved the regularization by using a k-fold cross-validation. 
+
+Code:
+
+first, create the edx and validation sets
+
+
 ```{r create_edx}
 ################################
 # Create edx set, validation set
@@ -16,6 +33,13 @@ output:
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+
+
+library(tidyverse)
+library(caret)
+library(data.table)
+library(tibble)
+library(pillar)
 
 # MovieLens 10M dataset:
 # https://grouplens.org/datasets/movielens/10m/
@@ -54,6 +78,8 @@ edx <- rbind(edx, removed)
 dim(edx)
 head(edx)
 ```
+Then, I defined train and test sets
+
 ```{r}
 #Define train and test sets
 # Test set will be 10% of edx data
@@ -73,13 +99,14 @@ test <- temp %>%
 removed <- anti_join(temp, test)
 train <- rbind(train, removed)
 ```
-
+Then I defined the RMSE function
 ```{r}
 #define RMSE function
 RMSE <- function(true_ratings, predicted_ratings){
   sqrt(mean((true_ratings - predicted_ratings)^2))
 }
 ```
+I starded tryng just the mean rating, then I improved the model by considering the movie effect, the user effect and the genres effect
 ```{r}
 
 #define mean rating
@@ -151,7 +178,7 @@ rmse_results <- tibble(method = c("Just the average","Movie effect","Users effec
 rmse_results
 
 ```
-
+The combined movie, user and genres effect modeling leads to a RMSE of 0.8656, not bad but could be improved by regularization. I first tryed a single regularization with a cross-validation test (indipendent from my test set)
 ```{r}
 #REGULARIZATION
 # define a cross-validation set for movies
@@ -191,6 +218,7 @@ rmses <- sapply(lambdas, function(l){
 qplot(lambdas, rmses)  
 lambdas[which.min(rmses)]
 ```
+Figure shows the lambda that minimizes RMSE for movie regularization
 ```{r}
 #now repeat for users
 
@@ -232,7 +260,7 @@ lambdas[which.min(rmses)]
 
 ```
 
-
+Figure shows the lambda that minimizes RMSE for users
 
 ```{r}
 #now for genres
@@ -271,7 +299,12 @@ rmses <- sapply(lambdas, function(l){
 qplot(lambdas, rmses)  
 lambdas[which.min(rmses)]
 ```
+Figure shows the lambda that minimizes RMSE for genres
 
+So, using a singel cross-validation test, we obtain the values of lambda that minimizes RMSE for  each effect and a graphical representation of the selection procedure.
+
+
+Now, to better select the lambdas, I did a k-fold cross validation with k=5 for each effect (movie, user and genre). This means, that 5 times for each predictor, a cross-validation set was defined. Then, I selected the average value of lambda for each predictor. 
 
 ```{r}
 #to select the best lambda values, perform k-fold cross-validation with k=5
@@ -390,9 +423,19 @@ l_3
 
 
 ```
+RESULTS
+
+Now, we can select the three values of lambda to be used in the final algorithm (results of the k-fold cross-validation), and look to the final results. I used only a single test set.
+
 
 ```{r}
 #now do regularization with the values l_1, l_2, l_3
+
+# values of lambda (movie, user, genre) by k-fold:
+
+l_1
+l_2
+l_3
 
 mu <- mean(train$rating)
 
@@ -426,10 +469,18 @@ regularized_movie_user_genre_rmse
 
 #write results
 
+options(pillar.sigfig=5)
+
 rmse_results <- tibble(method = c("Just the average","Movie effect","Users effect","Genre effect","Movie, users and genre effect", "Regularized"), RMSE = c(naive_rmse,movie_effect_rmse,users_effect_rmse,genre_effect_rmse,movie_users_genre_effect_rmse,regularized_movie_user_genre_rmse))
 
 rmse_results
 ```
+Results demonstrate that:
+
+a) the movie effect is stronger than user and genre effect. User effect is stronger than genre. Combined model leads to a good result.
+b) Regularization permits to obtain a value close to the requested value by the exercise.
+c) Probably the k-fold cross-validation improved the result just a little, but I did it becouse is a more correct procedure. What I did not was a cross-validation considering the test set, I just used one. But also in the textbook was underlined that in practice this is a common strategy to save computational time.
+
 
 ```{r}
 #now check the best RMSE with validation set
@@ -465,4 +516,14 @@ regularized_movie_user_genre_rmse_check<-RMSE(predicted_ratings, validation$rati
 regularized_movie_user_genre_rmse_check
 
 ```
+
+CONCLUSIONS
+
+The validation test is used to confirm the RSME obtained with the train set. I used this time the complete edx set and the validation. The value is better than required (0.8644875 < 0.86490).
+
+Future possible improvements: an even better result could be obtained by considering the time as a predictor. Other idea could be to look at the number of genres assigned to each movie. It is possible that movies with more genres assigned had higher ratings than movies with just one genre assigned. But I did not check this. 
+
+
+
+
 
